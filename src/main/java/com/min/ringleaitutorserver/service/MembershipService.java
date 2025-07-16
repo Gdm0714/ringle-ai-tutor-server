@@ -8,6 +8,7 @@ import com.min.ringleaitutorserver.exception.MembershipErrorCode;
 import com.min.ringleaitutorserver.repository.MembershipRepository;
 import com.min.ringleaitutorserver.repository.UserMembershipRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class MembershipService {
 
     private final MembershipRepository membershipRepository;
@@ -35,8 +37,8 @@ public class MembershipService {
         }
 
         if (userMembership.isExpired()) {
-            UserMembership expired = userMembership.expire();
-            userMembershipRepository.save(expired);
+            userMembership.setStatus("expired");
+            userMembershipRepository.save(userMembership);
             return null;
         }
 
@@ -50,21 +52,28 @@ public class MembershipService {
                 .orElse(null);
 
         if (userMembership == null) {
+            log.warn("No active membership found for user: {}", userId);
             return false;
         }
 
         if (userMembership.isExpired()) {
-            UserMembership expired = userMembership.expire();
-            userMembershipRepository.save(expired);
+            log.info("Membership expired for user: {}", userId);
+            userMembership.setStatus("expired");
+            userMembershipRepository.save(userMembership);
             return false;
         }
 
         if (!userMembership.canUseConversation()) {
+            log.warn("User {} cannot use conversation. Used: {}, Limit: {}", 
+                userId, userMembership.getConversationUsed(), 
+                userMembership.getMembership().getConversationLimit());
             return false;
         }
 
-        UserMembership updated = userMembership.useConversation();
-        userMembershipRepository.save(updated);
+        userMembership.setConversationUsed(userMembership.getConversationUsed() + 1);
+        userMembershipRepository.save(userMembership);
+        log.info("Conversation used for user: {}. Used: {}", 
+            userId, userMembership.getConversationUsed());
         return true;
     }
 
@@ -114,6 +123,11 @@ public class MembershipService {
         if (!membershipRepository.existsById(membershipId)) {
             throw new BusinessException(MembershipErrorCode.MEMBERSHIP_NOT_FOUND);
         }
+        
+        // 해당 멤버십을 참조하는 모든 UserMembership을 먼저 삭제
+        userMembershipRepository.deleteByMembershipId(membershipId);
+        
+        // 이제 멤버십 삭제
         membershipRepository.deleteById(membershipId);
     }
 
@@ -121,8 +135,8 @@ public class MembershipService {
     public void deleteUserMembership(Long userId) {
         List<UserMembership> userMemberships = userMembershipRepository.findByUserIdAndStatus(userId, "active");
         userMemberships.forEach(um -> {
-            UserMembership expired = um.expire();
-            userMembershipRepository.save(expired);
+            um.setStatus("expired");
+            userMembershipRepository.save(um);
         });
     }
 

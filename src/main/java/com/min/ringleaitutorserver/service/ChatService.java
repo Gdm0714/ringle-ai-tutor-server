@@ -135,8 +135,14 @@ public class ChatService {
         return Map.of(
             "contents", List.of(
                 Map.of("parts", List.of(
-                    Map.of("text", systemPrompt + "\n\nUser: " + userMessage)
+                    Map.of("text", systemPrompt + "\n\nUser: " + userMessage + "\n\nPlease respond naturally and don't repeat previous responses. Be creative and engaging.")
                 ))
+            ),
+            "generationConfig", Map.of(
+                "temperature", 0.7,
+                "topK", 40,
+                "topP", 0.95,
+                "maxOutputTokens", 1024
             )
         );
     }

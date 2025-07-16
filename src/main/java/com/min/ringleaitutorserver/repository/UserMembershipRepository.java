@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface UserMembershipRepository extends JpaRepository<UserMembership, Long> {
     Optional<UserMembership> findFirstByUserIdAndStatusOrderByExpiryDateDesc(Long userId, String status);
     List<UserMembership> findByUserIdAndStatus(Long userId, String status);
+    void deleteByMembershipId(Long membershipId);
 }
