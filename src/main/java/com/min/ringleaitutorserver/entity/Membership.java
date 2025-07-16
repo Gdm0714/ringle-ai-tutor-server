@@ -23,7 +23,6 @@ public class Membership {
 
     private Integer conversationLimit;
 
-    private Integer analysisLimit;
 
     @NotNull
     private Integer durationDays;
@@ -35,25 +34,22 @@ public class Membership {
     private Boolean isCustom = false;
 
     public static Membership of(String name, MembershipType type, Integer conversationLimit, 
-                               Integer analysisLimit, Integer durationDays, Integer price) {
+                               Integer durationDays, Integer price) {
         return Membership.builder()
                 .name(name)
                 .type(type)
                 .conversationLimit(conversationLimit)
-                .analysisLimit(analysisLimit)
                 .durationDays(durationDays)
                 .price(price)
                 .build();
     }
 
     public static Membership createCustomMembership(String name, MembershipType type, 
-                                                   Integer conversationLimit, Integer analysisLimit, 
-                                                   Integer durationDays, Integer price) {
+                                                   Integer conversationLimit, Integer durationDays, Integer price) {
         return Membership.builder()
                 .name(name)
                 .type(type)
                 .conversationLimit(conversationLimit)
-                .analysisLimit(analysisLimit)
                 .durationDays(durationDays)
                 .price(price)
                 .isCustom(true)
