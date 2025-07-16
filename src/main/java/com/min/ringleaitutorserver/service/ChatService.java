@@ -2,13 +2,13 @@ package com.min.ringleaitutorserver.service;
 
 import com.google.cloud.speech.v1.*;
 import com.google.protobuf.ByteString;
-import com.min.ringleaitutorserver.config.AppConfig;
 import com.min.ringleaitutorserver.dto.ChatRequestDto;
 import com.min.ringleaitutorserver.dto.ChatResponseDto;
 import com.min.ringleaitutorserver.exception.BusinessException;
 import com.min.ringleaitutorserver.exception.ChatErrorCode;
 import com.min.ringleaitutorserver.util.StringUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -25,8 +25,10 @@ import java.util.Map;
 public class ChatService {
 
     private final MembershipService membershipService;
-    private final AppConfig appConfig;
     private final RestTemplate restTemplate;
+    
+    @Value("${app.gemini.api-key}")
+    private String geminiApiKey;
 
     // AI 대화 처리
     public ChatResponseDto processChat(ChatRequestDto request) {
@@ -37,7 +39,7 @@ public class ChatService {
         String userMessage = extractUserMessage(request);
         validateMessage(userMessage);
 
-        String aiResponse = callGemini(userMessage, appConfig.getGemini().getSystemPrompt());
+        String aiResponse = callGemini(userMessage, "You are an English tutor helping Korean students learn English. Be friendly and encouraging.");
 
         return ChatResponseDto.builder()
                 .userMessage(userMessage)
@@ -70,45 +72,35 @@ public class ChatService {
             byte[] audioBytes = Base64.getDecoder().decode(audioBase64);
             ByteString audioData = ByteString.copyFrom(audioBytes);
 
-            RecognitionConfig config = buildRecognitionConfig();
+            RecognitionConfig config = RecognitionConfig.newBuilder()
+                    .setEncoding(RecognitionConfig.AudioEncoding.WEBM_OPUS)
+                    .setSampleRateHertz(48000)
+                    .setLanguageCode("en-US")
+                    .build();
             RecognitionAudio audio = RecognitionAudio.newBuilder()
                     .setContent(audioData)
                     .build();
 
             RecognizeResponse response = speechClient.recognize(config, audio);
-            return extractTranscriptFromResponse(response);
+            if (response.getResultsList().isEmpty()) {
+                return "음성을 인식할 수 없습니다. 다시 말해주세요.";
+            }
+            
+            return response.getResults(0)
+                    .getAlternatives(0)
+                    .getTranscript();
                     
         } catch (Exception e) {
             throw new BusinessException(ChatErrorCode.SPEECH_RECOGNITION_ERROR);
         }
     }
 
-    // 음성 인식 설정 생성
-    private RecognitionConfig buildRecognitionConfig() {
-        return RecognitionConfig.newBuilder()
-                .setEncoding(RecognitionConfig.AudioEncoding.valueOf(appConfig.getSpeech().getEncoding()))
-                .setSampleRateHertz(appConfig.getSpeech().getSampleRateHertz())
-                .setLanguageCode(appConfig.getSpeech().getLanguageCode())
-                .build();
-    }
-
-    // 음성 인식 결과 추출
-    private String extractTranscriptFromResponse(RecognizeResponse response) {
-        if (response.getResultsList().isEmpty()) {
-            return appConfig.getSpeech().getFallbackMessage();
-        }
-        
-        return response.getResults(0)
-                .getAlternatives(0)
-                .getTranscript();
-    }
 
     // Gemini API 호출
     private String callGemini(String userMessage, String systemPrompt) {
-        String apiKey = appConfig.getGemini().getApiKey();
-        validateApiKey(apiKey);
+        validateApiKey(geminiApiKey);
 
-        String url = buildGeminiUrl(apiKey);
+        String url = buildGeminiUrl(geminiApiKey);
         Map<String, Object> requestBody = buildRequestBody(userMessage, systemPrompt);
         
         try {
@@ -133,8 +125,7 @@ public class ChatService {
     // Gemini URL 생성
     private String buildGeminiUrl(String apiKey) {
         return String.format(
-            "https://generativelanguage.googleapis.com/v1/models/%s:generateContent?key=%s",
-            appConfig.getGemini().getModel(),
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=%s",
             apiKey
         );
     }
