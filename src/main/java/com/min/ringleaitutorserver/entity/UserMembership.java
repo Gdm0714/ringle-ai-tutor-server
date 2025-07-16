@@ -26,9 +26,6 @@ public class UserMembership {
     @Builder.Default
     private Integer conversationUsed = 0;
 
-    @NotNull
-    @Builder.Default
-    private Integer analysisUsed = 0;
 
     @NotNull
     private LocalDateTime startDate;
@@ -72,29 +69,12 @@ public class UserMembership {
         return limit == null || conversationUsed < limit;
     }
 
-    public boolean canUseAnalysis() {
-        if (isExpired() || !"active".equals(status)) {
-            return false;
-        }
-        Integer limit = membership.getAnalysisLimit();
-        return limit == null || analysisUsed < limit;
-    }
-
     public UserMembership useConversation() {
         if (!canUseConversation()) {
             throw new IllegalStateException("대화 기능을 사용할 수 없습니다");
         }
         return this.toBuilder()
                 .conversationUsed(conversationUsed + 1)
-                .build();
-    }
-
-    public UserMembership useAnalysis() {
-        if (!canUseAnalysis()) {
-            throw new IllegalStateException("분석 기능을 사용할 수 없습니다");
-        }
-        return this.toBuilder()
-                .analysisUsed(analysisUsed + 1)
                 .build();
     }
 
